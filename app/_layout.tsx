@@ -1,37 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+// app/layout.js
+import React, { useEffect } from "react";
+import { Provider as ReduxProvider, useDispatch } from "react-redux";
+import { Provider as PaperProvider } from "react-native-paper";
+import { useRouter } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import store from "../store/store";
+import { setUser, clearUser } from "../store/authSlice";
+import { auth } from "../firebaseConfig";
+import { Slot } from "expo-router";
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+const RootLayout = () => {
+  const dispatch = useDispatch();
+  const router = useRouter();
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        dispatch(setUser(user)); // setUser now serializes the user data
+        router.replace("/home");
+      } else {
+        dispatch(clearUser());
+        router.replace("/signin");
+      }
+    });
 
-  if (!loaded) {
-    return null;
-  }
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </ThemeProvider>
+    <PaperProvider>
+      <Slot />
+    </PaperProvider>
+  );
+};
+
+export default function LayoutWrapper() {
+  return (
+    <ReduxProvider store={store}>
+      <RootLayout />
+    </ReduxProvider>
   );
 }
